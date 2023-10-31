@@ -12,6 +12,8 @@ import android.nfc.Tag;
 import android.nfc.tech.IsoDep;
 import android.os.Bundle;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.gson.Gson;
@@ -37,6 +39,11 @@ public class MainActivity extends AppCompatActivity {
     Retrofit.Builder builder = new Retrofit.Builder();
     GTWaterwareAPI waterwareAPI ;
 
+    EditText etChargeValue ;
+    EditText etCustomerName;
+    EditText etCustomerId;
+    EditText etBalance;
+    EditText etReceiptNo;
 
     Tag NFCtag ;
     IsoDep isoDep ;
@@ -63,6 +70,12 @@ public class MainActivity extends AppCompatActivity {
 
         btnSendCommand = findViewById(R.id.btnSendCommand);
 
+
+        etCustomerName = findViewById(R.id.etCustomerName);
+        etCustomerId = findViewById(R.id.etCustomerId);
+        etBalance = findViewById(R.id.etBalance);
+        etReceiptNo = findViewById(R.id.etReceiptNo);
+        etChargeValue = findViewById(R.id.etChargeValue);
         try {
             this.initNfcService(context);
         } catch (Exception exc) {
@@ -110,7 +123,7 @@ public class MainActivity extends AppCompatActivity {
 
      }
 
-    private SahlChargeReceiptData SahlChargeCard(byte[] buffer) {
+    private SahlChargeReceiptData SahlChargeCard(byte[] buffer , String ChargeValue ) {
         SahlChargeReceiptData _SahlChargeReceiptData = new SahlChargeReceiptData();
 
         String StCardID     = null;
@@ -154,10 +167,14 @@ public class MainActivity extends AppCompatActivity {
                         final WriteMsg ChargeRequest = new WriteMsg() ;
                         ChargeRequest.indexcmd = response.body().Buffer.indexcmd;
                         ChargeRequest.cmdmsg = Responsemsg[0];
-                        _CustomerChargeMsg = PrepareCustomerChargeMsg("10", ChargeRequest, buffer);
+                        _CustomerChargeMsg = PrepareCustomerChargeMsg(ChargeValue, ChargeRequest, buffer);
                         if(_customerChargeMsg.WriteMsg != null ) {
                             Toast.makeText(  getApplication().getApplicationContext()  , "Sucess Charging Card by : " + _customerChargeMsg.ChargeValue , Toast.LENGTH_LONG   ).show() ;
                         }
+                        etBalance.setText(response.body().Balance)  ;
+                        etCustomerId.setText(response.body().CustomerID)  ;
+                        etCustomerName.setText(response.body().CustomerName)  ;
+                        etReceiptNo.setText(response.body().Utilityname)  ;
 
                     }
             }
@@ -260,12 +277,15 @@ public class MainActivity extends AppCompatActivity {
                         //ChargeRequest.setCardID( response.body().getCardID())  ;
                         ChargeRequest.indexcmd = response.body().indexcmd ;
                         ChargeRequest.cmdmsg = Responsemsg[0] ;
-                        _CustomerChargeMsg =  PrepareCustomerChargeMsg("10" , ChargeRequest , buffer ) ;
+                        String ChargeValue = "10" ;
+                        ChargeValue = String.valueOf(etChargeValue.getText());
+
+                        _CustomerChargeMsg =  PrepareCustomerChargeMsg(ChargeValue, ChargeRequest , buffer ) ;
 
                         if(_customerChargeMsg.WriteMsg != null ) {
 //                            Toast.makeText( getParent().getApplicationContext()  , "Sucess Reading Card" , Toast.LENGTH_SHORT   ).show() ;
                             String customerChargeMsg_  =  gson.toJson(_customerChargeMsg) ;
-                            SahlChargeReceiptData _SahlChargeReceiptData = SahlChargeCard(buffer) ;
+                            SahlChargeReceiptData _SahlChargeReceiptData = SahlChargeCard(buffer , ChargeValue ) ;
                         }
                     }
             }

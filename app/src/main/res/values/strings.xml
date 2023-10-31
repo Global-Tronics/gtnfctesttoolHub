@@ -1,4 +1,9 @@
 <resources>
     <string name="app_name">GT Charge Water Meter Card</string>
     <string name="send_nfc_command">GT Charge Water Meter Card</string>
+    <string name="customer_name">Customer Name</string>
+    <string name="customer_id">Customer Id</string>
+    <string name="balance">Balance</string>
+    <string name="receipt_no">Utility Name</string>
+    <string name="charge_value">Charge Value</string>
 </resources>

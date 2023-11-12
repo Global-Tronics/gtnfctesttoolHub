@@ -1,7 +1,5 @@
 package com.example.nfc_app;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.PendingIntent;
@@ -13,24 +11,27 @@ import android.nfc.tech.IsoDep;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
+
+import gt.nfc.wmlib.GTNFCWaterMeterClass;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.nio.ByteBuffer;
-
 public class MainActivity extends AppCompatActivity {
-
+    GTNFCWaterMeterClass GTNFCWaterMeter ;
+//    MethodChannel channel = new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), "my_flutter_library");
     Retrofit retro;
     String retresponse ;
     SahlMesasage SahlMesasage ;
@@ -38,8 +39,7 @@ public class MainActivity extends AppCompatActivity {
     Gson gson = new GsonBuilder().setLenient().create();
     Retrofit.Builder builder = new Retrofit.Builder();
     GTWaterwareAPI waterwareAPI ;
-
-    EditText etChargeValue ;
+     EditText etChargeValue ;
     EditText etCustomerName;
     EditText etCustomerId;
     EditText etBalance;
@@ -81,7 +81,7 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception exc) {
             Toast.makeText(this.context, exc.toString(), Toast.LENGTH_LONG).show();
         }
-
+        GTNFCWaterMeter = new GTNFCWaterMeterClass() ;
         SahlMesasage = new SahlMesasage();
         _CustomerChargeMsg = new CustomerChargeMsg() ;
         gson = new GsonBuilder().setLenient().create();
@@ -105,13 +105,26 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText( this.getApplicationContext()  , "No NFC tag" , Toast.LENGTH_SHORT   ).show() ;
                 return;
             }
-            byte[] buffer = NFCtag.getId();
-//            //CardSerialNo = readCardSN(intent);
-//            byte[] CmdBuffer = {0x00 ,(byte)0xA4 ,0x04 ,0x00 ,0x09 ,
-//                    (byte)0xAE,0x02 ,0x00 ,0x00 ,0x00 ,0x00 ,0x02 ,0x00 ,0x00} ;
-//            byte[] ResponseBuffer = APISample(isoDep , CmdBuffer) ;
-//            System.out.println("Done");
-                WriteMsg ChargeMsg = ReadingCard(buffer);
+                byte[] buffer  = NFCtag.getId();
+                String GTNFCWaterMeterReadingJson  =GTNFCWaterMeter.GetReading(isoDep) ;
+                WriteMsg ChargeRequest = gson.fromJson(GTNFCWaterMeterReadingJson, WriteMsg.class);
+
+
+                String ChargeValue  = String.valueOf(etChargeValue.getText());
+
+                _CustomerChargeMsg =  PrepareCustomerChargeMsg(ChargeValue, ChargeRequest , buffer ) ;
+
+
+                if(_customerChargeMsg.WriteMsg != null ) {
+                    String customerChargeMsg_  =  gson.toJson(_customerChargeMsg) ;
+                    SahlChargeReceiptData _SahlChargeReceiptData = SahlChargeCard(buffer , ChargeValue ) ;
+                }
+
+
+
+
+
+       //         WriteMsg ChargeMsg = ReadingCard(buffer);
 
             }
             catch (Exception exp)
@@ -137,46 +150,59 @@ public class MainActivity extends AppCompatActivity {
         ReadingCardresponse.enqueue(new Callback<SahlChargeReceiptData>() {
             @Override
             public void onResponse(Call<SahlChargeReceiptData> call, Response<SahlChargeReceiptData> response) {
-                if (response.body() != null)
+                if (response.body() != null) {
                     if (response.body().Buffer.cmdmsg.length > 0) {
-                        Responsemsg[0] = new String[response.body().Buffer.cmdmsg.length];
+                        SahlChargeReceiptData SahlChargeReceiptData = response.body();
+                        String _SahlChargeReceiptData = gson.toJson(SahlChargeReceiptData) ;
+                        String Rerst = GTNFCWaterMeter.SetCharging(isoDep , _SahlChargeReceiptData) ;
+                       // Charging(_SahlChargeReceiptData);
+                        etBalance.setText(response.body().Balance);
+                        etCustomerId.setText(response.body().CustomerID);
+                        etCustomerName.setText(response.body().CustomerName);
+                        etReceiptNo.setText(response.body().Utilityname);
+
+                    }
+                }
+                else
+                {
+                    Toast.makeText(  getApplication().getApplicationContext()  , response.errorBody().toString() , Toast.LENGTH_LONG   ).show() ;
+
+                }
+            }
+
+            private void Charging( SahlChargeReceiptData  SahlChargeReceiptData) {
+                Responsemsg[0] = new String[SahlChargeReceiptData.Buffer.cmdmsg.length];
+                try {
+                    if (!isoDep.isConnected())
+                        isoDep.connect();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                //Response =
+                for (int i = 0; i < SahlChargeReceiptData.Buffer.cmdmsg.length; i++) {
+                    String cmdmsg = SahlChargeReceiptData.Buffer.cmdmsg[i];
+                    if (cmdmsg != null) {
+                        byte[] Decryptedcmdmsg = SahlMesasage.DecryptBuffer(cmdmsg);
+                        byte[] ResponseBuffer = new byte[0];
                         try {
-                            if (!isoDep.isConnected())
-                                isoDep.connect();
+                            ResponseBuffer = isoDep.transceive(Decryptedcmdmsg);
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }
-                        //Response =
-                        for (int i = 0; i < response.body().Buffer.cmdmsg.length; i++) {
-                            String cmdmsg = response.body().Buffer.cmdmsg[i];
-                            if (cmdmsg != null) {
-                                byte[] Decryptedcmdmsg = SahlMesasage.DecryptBuffer(cmdmsg);
-                                byte[] ResponseBuffer = new byte[0];
-                                try {
-                                    ResponseBuffer = isoDep.transceive(Decryptedcmdmsg);
-                                } catch (IOException e) {
-                                    throw new RuntimeException(e);
-                                }
 
 
-                                String APDUResponse = SahlMesasage.bytesToHex(ResponseBuffer);
-                                Responsemsg[0][i] = APDUResponse;
-                            }
-
-                        }
-                        final WriteMsg ChargeRequest = new WriteMsg() ;
-                        ChargeRequest.indexcmd = response.body().Buffer.indexcmd;
-                        ChargeRequest.cmdmsg = Responsemsg[0];
-                        _CustomerChargeMsg = PrepareCustomerChargeMsg(ChargeValue, ChargeRequest, buffer);
-                        if(_customerChargeMsg.WriteMsg != null ) {
-                            Toast.makeText(  getApplication().getApplicationContext()  , "Sucess Charging Card by : " + _customerChargeMsg.ChargeValue , Toast.LENGTH_LONG   ).show() ;
-                        }
-                        etBalance.setText(response.body().Balance)  ;
-                        etCustomerId.setText(response.body().CustomerID)  ;
-                        etCustomerName.setText(response.body().CustomerName)  ;
-                        etReceiptNo.setText(response.body().Utilityname)  ;
-
+                        String APDUResponse = SahlMesasage.bytesToHex(ResponseBuffer);
+                        Responsemsg[0][i] = APDUResponse;
                     }
+
+                }
+                final WriteMsg ChargeRequest = new WriteMsg() ;
+                ChargeRequest.indexcmd = SahlChargeReceiptData.Buffer.indexcmd;
+                ChargeRequest.cmdmsg = Responsemsg[0];
+                _CustomerChargeMsg = PrepareCustomerChargeMsg(ChargeValue, ChargeRequest, buffer);
+                if(_customerChargeMsg.WriteMsg != null ) {
+                    Toast.makeText(  getApplication().getApplicationContext()  , "Sucess Charging Card by : " + _customerChargeMsg.ChargeValue , Toast.LENGTH_LONG   ).show() ;
+                }
             }
 
             @Override
@@ -212,7 +238,12 @@ public class MainActivity extends AppCompatActivity {
         _customerChargeMsg.WriteMsg =  gson.toJson(ChargeMsg) ;
         return      _customerChargeMsg ;
     }
+    /*
     private WriteMsg ReadingCard(byte[] buffer) {
+
+        //channel.invokeMethod("someMethod");
+
+
         String StCardID     = null;
         final String[][] Responsemsg = {{null}};
         try {
@@ -297,7 +328,7 @@ public class MainActivity extends AppCompatActivity {
         });
         return ChargeRequest ;
     }
-
+*/
     private void initNfcService(Context context) {
         try {
             this.nfcAdapter = NfcAdapter.getDefaultAdapter(context);
@@ -369,3 +400,5 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 }
+
+
